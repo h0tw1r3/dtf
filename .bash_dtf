@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# MIT License
+# Copyright (c) 2021 Jeffrey Clark <https://github.com/h0tw1r3>
+
 alias _dtf='/usr/bin/env git --git-dir="$HOME/.dtf" --work-tree="$HOME"'
 
 _dtf_msg() {
