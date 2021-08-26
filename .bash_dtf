@@ -6,9 +6,18 @@ _dtf_msg() {
     echo >&2 "${_DTF_FN}: $*"
 }
 
+_dtf_output_url() {
+    if command -v curl >/dev/null ; then
+        curl --connect-timeout 5 -L -sSf -o "${2}" "${1}";
+    else
+        wget --timeout 5 --tries=1 -qO "${2}" "${1}";
+    fi
+}
+
 dtf() {
     local _CHECKS="${DTF_CHECKS:-1}"
     local _REPO="$HOME/.${FUNCNAME[*]}"
+    local _DTFURL="${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf}"
     local _BRANCH="${DTF_BRANCH:-master}"
     local _INIT
     if [ -z "$_DTF_FN" ] ; then
@@ -52,9 +61,9 @@ dtf() {
                     return 1
                 fi
             fi
-            if ! grep -q "^source.*bash_dtf$" "${HOME}/.bashrc" 2>/dev/null ; then
-                [ -f "${HOME}/.bashrc" ] || touch "${HOME}/.bashrc"
-                echo "source ~/.bash_dtf" >> "${HOME}/.bashrc"
+            if ! grep -q "^source ~/.bash_dtf$" ~/.bashrc 2>/dev/null ; then
+                [ -f ~/.bashrc ] || touch ~/.bashrc
+                echo "source ~/.bash_dtf" >> ~/.bashrc
             fi
         fi
         if [ -n "${_INIT}" ] ; then
@@ -71,6 +80,24 @@ dtf() {
             fi
             _dtf submodule update --recursive
         fi
+    fi
+    if [ ! -f ~/.bash_dtf ] ; then
+        {
+            alias _dtf
+            declare -f _dtf_msg
+            declare -f _dtf_output_url
+            declare -f dtf
+        } > ~/.bash_dtf
+    elif [ "$*" == "upgrade" ] ; then
+        if _dtf_output_url "${_DTFURL}" ~/.bash_dtf.$$ ; then
+            source ~/.bash_dtf.$$ && \
+                cat ~/.bash_dtf.$$ > ~/.bash_dtf && \
+                rm -f ~/.bash_dtf.$$
+        else
+            echo >&2 "failed to upgrade dtf"
+            return 1
+        fi
+        return
     fi
 
     _dtf "$@"
