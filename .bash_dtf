@@ -7,6 +7,7 @@ _dtf_msg() {
 }
 
 dtf() {
+    local _CHECKS="${DTF_CHECKS:-1}"
     local _REPO="$HOME/.${FUNCNAME[*]}"
     local _BRANCH="${DTF_BRANCH:-master}"
     local _INIT
@@ -26,27 +27,34 @@ dtf() {
                 return 1
             fi
             _INIT=1
+            _CHECKS=1
         fi
-        if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
-            if ! _dtf config --local status.showUntrackedFiles no ; then
-                _dtf_msg "config set failed"
-                return 1
-            else
-                _dtf_msg "config set"
+        if [ "${_CHECKS}" -eq 1 ] ; then
+            if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
+                if ! _dtf config --local status.showUntrackedFiles no ; then
+                    _dtf_msg "config set failed"
+                    return 1
+                else
+                    _dtf_msg "config set"
+                fi
             fi
-        fi
-        if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
-            if ! _dtf remote add origin "$DTF_REPO" ; then
-                _dtf_msg "failed to add remote origin $DTF_REPO"
-                return 1
-            else
-                _dtf_msg "remote origin added"
+            if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
+                if ! _dtf remote add origin "$DTF_REPO" ; then
+                    _dtf_msg "failed to add remote origin $DTF_REPO"
+                    return 1
+                else
+                    _dtf_msg "remote origin added"
+                fi
             fi
-        fi
-        if [ ! -d "${_REPO}/refs/remotes/origin" ] ; then
-            if ! _dtf fetch origin ; then
-                _dtf_msg "failed to fetch remote"
-                return 1
+            if [ ! -d "${_REPO}/refs/remotes/origin" ] ; then
+                if ! _dtf fetch origin ; then
+                    _dtf_msg "failed to fetch remote"
+                    return 1
+                fi
+            fi
+            if ! grep -q "^source.*bash_dtf$" "${HOME}/.bashrc" 2>/dev/null ; then
+                [ -f "${HOME}/.bashrc" ] || touch "${HOME}/.bashrc"
+                echo "source ~/.bash_dtf" >> "${HOME}/.bashrc"
             fi
         fi
         if [ -n "${_INIT}" ] ; then
