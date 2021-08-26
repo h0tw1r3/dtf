@@ -1,0 +1,69 @@
+#!/bin/bash
+
+alias _dtf='/usr/bin/env git --git-dir="$HOME/.dtf" --work-tree="$HOME"'
+
+_dtf_msg() {
+    echo >&2 "${_DTF_FN}: $*"
+}
+
+dtf() {
+    local _REPO="$HOME/.${FUNCNAME[*]}"
+    local _BRANCH="${DTF_BRANCH:-master}"
+    local _INIT
+    if [ -z "$_DTF_FN" ] ; then
+        export _DTF_FN="${FUNCNAME[*]}"
+    fi
+
+    if [ -z "$DTF_REPO" ] ; then
+        echo >&2 "${FUNCNAME[*]}: DTF_REPO not set"
+        return 1
+    else
+        if [ ! -d "$_REPO" ] ; then
+            if _dtf init "$_REPO" >/dev/null ; then
+                _dtf_msg "init repo $_REPO"
+            else
+                _dtf_msg "failed to init repo"
+                return 1
+            fi
+            _INIT=1
+        fi
+        if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
+            if ! _dtf config --local status.showUntrackedFiles no ; then
+                _dtf_msg "config set failed"
+                return 1
+            else
+                _dtf_msg "config set"
+            fi
+        fi
+        if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
+            if ! _dtf remote add origin "$DTF_REPO" ; then
+                _dtf_msg "failed to add remote origin $DTF_REPO"
+                return 1
+            else
+                _dtf_msg "remote origin added"
+            fi
+        fi
+        if [ ! -d "${_REPO}/refs/remotes/origin" ] ; then
+            if ! _dtf fetch origin ; then
+                _dtf_msg "failed to fetch remote"
+                return 1
+            fi
+        fi
+        if [ -n "${_INIT}" ] ; then
+            _dtf reset --hard origin/${_BRANCH}
+            _dtf submodule update --init --recursive
+        fi
+        local _TREF
+        _TREF=$(_dtf for-each-ref --format='%(upstream:short)' "$(_dtf symbolic-ref -q HEAD)")
+        if [ "${_TREF}" != "origin/${_BRANCH}" ] ; then
+            if ! _dtf branch -u "origin/${_BRANCH}" ; then
+                # TODO check if new repo
+                _dtf_msg "failed to track origin/${_BRANCH}, new repository?"
+                return 1
+            fi
+            _dtf submodule update --recursive
+        fi
+    fi
+
+    _dtf "$@"
+}
