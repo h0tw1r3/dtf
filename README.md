@@ -6,7 +6,7 @@ home directory management with git
 
 1. Create a public or private git repo and export `DTF_REPO` with the URL.
 
-    export DTF_REPO="https://github.com/h0tw1r3/dtf_example.git"
+       export DTF_REPO="https://github.com/h0tw1r3/dtf_example.git"
 
 2. Source the latest version of supported for your shell.
    _Currently only bash is supported._
