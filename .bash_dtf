@@ -19,16 +19,16 @@ _dtf_output_url() {
 
 dtf() {
     local _CHECKS="${DTF_CHECKS:-1}"
-    local _REPO="$HOME/.${FUNCNAME[*]}"
+    local _REPO="$HOME/.${FUNCNAME[0]}"
     local _DTFURL="${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf}"
     local _BRANCH="${DTF_BRANCH:-master}"
     local _INIT
     if [ -z "$_DTF_FN" ] ; then
-        export _DTF_FN="${FUNCNAME[*]}"
+        export _DTF_FN="${FUNCNAME[0]}"
     fi
 
     if [ -z "$DTF_REPO" ] ; then
-        echo >&2 "${FUNCNAME[*]}: DTF_REPO not set"
+        echo >&2 "${FUNCNAME[0]}: DTF_REPO not set"
         return 1
     else
         if [ ! -f "$_REPO/config" ] ; then
