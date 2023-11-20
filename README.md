@@ -11,7 +11,7 @@ home directory management with git
 2. Source the latest version of supported for your shell.
    _Currently only bash is supported._
 
-       source <(curl -Ls https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf)
+       source /dev/stdin <<< "$(curl -Ls https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf)"
 
 3. Watch the magic! __Careful, files in your `DTF_REPO` will overwrite
    any existing files in your home directory!__
