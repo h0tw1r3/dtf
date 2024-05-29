@@ -91,7 +91,7 @@ dtf() {
             declare -f _dtf_output_url
             declare -f dtf
         } > ~/.bash_dtf
-    elif [ "$*" == "upgrade" ] ; then
+    elif [[ "$*" == "upgrade" ]] ; then
         if _dtf_output_url "${_DTFURL}" ~/.bash_dtf.$$ ; then
             source ~/.bash_dtf.$$ && \
                 cat ~/.bash_dtf.$$ > ~/.bash_dtf && \
