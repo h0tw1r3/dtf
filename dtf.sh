@@ -9,6 +9,13 @@ _dtf_msg() {
     printf >&2 "%s: %s" "$_DTF_FN" "$*\n"
 }
 
+_dtf_clear() {
+    unset _DTF_FN
+    unset _DTF_WORKDIR
+    unset _DTF_INIT
+    unset _DTF_RCFILE
+}
+
 _dtf_output_url() {
     if command -v curl >/dev/null ; then
         curl --connect-timeout 5 -L -sSf -o "${2}" "${1}";
@@ -22,74 +29,59 @@ dtf() {
     export _DTF_WORKDIR="$HOME/.${_DTF_FN}"
     DTF_URL=${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/dtf.sh}
     DTF_BRANCH=${DTF_BRANCH:-main}
-    if [ -z "$DTF_REPO" ] ; then
-        echo >&2 "${_DTF_FN}: DTF_REPO not set"
-        return 1
-    else
-        if [ ! -f "${_DTF_WORKDIR}/config" ] ; then
-            if ! _dtf init "$_DTF_WORKDIR" >/dev/null ; then
-                _dtf_msg "failed to init repo"
-                return 1
-            fi
-            _DTF_INIT=1
-            DTF_CHECKS=1
+    if [ ! -f "${_DTF_WORKDIR}/config" ] ; then
+        if ! _dtf init "$_DTF_WORKDIR" >/dev/null ; then
+            _dtf_msg "failed to init repo"
+            _dtf_clear ; return 1
         fi
-        if [ "${DTF_CHECKS:-0}" -eq 1 ] ; then
-            unset DTF_CHECKS
-            if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
-                if ! _dtf config --local status.showUntrackedFiles no ; then
-                    _dtf_msg "config set failed"
-                    return 1
-                fi
+        _DTF_INIT=1
+    fi
+    if [ "${_DTF_INIT:-$DTF_CHECKS}" -eq 1 ] ; then
+        if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
+            if ! _dtf config --local status.showUntrackedFiles no ; then
+                _dtf_msg "config set failed"
+                _dtf_clear ; return 1
             fi
-            if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
-                if ! _dtf remote add origin "$DTF_REPO" ; then
-                    _dtf_msg "failed to add remote origin $DTF_REPO"
-                    return 1
-                fi
+        fi
+        if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
+            if [ -z "${DTF_REPO:-}" ] ; then
+                _dtf_msg "DTF_REPO not set! Please set it to the git URL of the repository to use."
+                _dtf_clear ; return 1
             fi
-            if [ ! -d "${_DTF_WORKDIR}/refs/remotes/origin" ] ; then
-                if ! _dtf fetch origin ; then
-                    _dtf_msg "failed to fetch remote"
-                    return 1
-                fi
+            if ! _dtf remote add origin "$DTF_REPO" ; then
+                _dtf_msg "failed to add remote origin $DTF_REPO"
+                _dtf_clear ; return 1
             fi
-            if [ -z "${DTF_AUTORC:-}" ] || [ "${DTF_AUTORC:-}" = "1" ] ; then
-                # add to POSIX (ash, ksh), bash, and zsh rc files
-                if [ -n "${ENV:-}" ] ; then
-                    _DTF_RCFILE="$ENV"
-                elif [ -n "${BASH_VERSION:-}" ] ; then
-                    _DTF_RCFILE="$HOME/.bashrc"
-                elif [ -n "${ZSH_VERSION:-}" ] ; then
-                    _DTF_RCFILE="$HOME/.zshrc"
-                fi
+        fi
+        if [ ! -d "${_DTF_WORKDIR}/refs/remotes/origin" ] ; then
+            if ! _dtf fetch origin ; then
+                _dtf_msg "failed to fetch remote"
+                _dtf_clear ; return 1
+            fi
+        fi
+        if [ -z "${DTF_AUTORC:-}" ] || [ "${DTF_AUTORC:-}" = "1" ] ; then
+            # add to POSIX (ash, ksh), bash, and zsh rc files
+            if [ -n "${ENV:-}" ] ; then
+                _DTF_RCFILE="$ENV"
+            elif [ -n "${BASH_VERSION:-}" ] ; then
+                _DTF_RCFILE="$HOME/.bashrc"
+            elif [ -n "${ZSH_VERSION:-}" ] ; then
+                _DTF_RCFILE="$HOME/.zshrc"
+            fi
 
-                if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
-                    [ -f "$_DTF_RCFILE" ] || touch "$_DTF_RCFILE"
-                    echo ". \"\$HOME/.${_DTF_FN}.sh\"" >> "$_DTF_RCFILE"
-                fi
-                unset _DTF_RCFILE
-            else
-                _dtf_msg "DTF_AUTORC is disabled, skipping shell source setup."
-                _dtf_msg "Manually add '. \"\$HOME/.${_DTF_FN}.sh\"' to your shell rc file."
+            if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
+                [ -f "$_DTF_RCFILE" ] || touch "$_DTF_RCFILE"
+                echo ". \"\$HOME/.${_DTF_FN}.sh\"" >> "$_DTF_RCFILE"
             fi
+            unset _DTF_RCFILE
+        else
+            _dtf_msg "DTF_AUTORC is disabled, skipping shell source setup."
+            _dtf_msg "Manually add '. \"\$HOME/.${_DTF_FN}.sh\"' to your shell rc file."
         fi
-        if [ -n "${_DTF_INIT:-}" ] ; then
-            _dtf reset --hard "origin/${DTF_BRANCH}"
+        if [ "${_DTF_INIT:-}" = "1" ] ; then
+            _dtf reset --hard "origin/${DTF_BRANCH}" && \
             _dtf submodule update --init --recursive
-            unset _DTF_INIT
         fi
-        _DTF_TREF=$(_dtf for-each-ref --format='%(upstream:short)' "$(_dtf symbolic-ref -q HEAD)")
-        if [ "${_DTF_TREF}" != "origin/${DTF_BRANCH}" ] ; then
-            unset _DTF_TREF
-            if ! _dtf branch -u "origin/${DTF_BRANCH}" ; then
-                # TODO check if new repo
-                _dtf_msg "failed to track origin/${DTF_BRANCH}, new repository?"
-                return 1
-            fi
-            _dtf submodule update --recursive
-        fi
-        unset _DTF_TREF
     fi
     if [ ! -f ~/."$_DTF_FN".sh ] ; then
         _dtf_msg "shell source is missing!? Please run '${_DTF_FN} upgrade' to install it again."
@@ -101,9 +93,9 @@ dtf() {
                 rm -f ~/."$_DTF_FN".sh.$$
         else
             _dtf_msg "upgrade failed"
-            return 1
+            _dtf_clear ; return 1
         fi
-        return
+        _dtf_clear ; return
     fi
 
     _dtf "$@"
