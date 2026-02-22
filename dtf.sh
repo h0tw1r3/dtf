@@ -6,7 +6,15 @@
 alias _dtf='/usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME"'
 
 _dtf_msg() {
-    printf >&2 "%s: %s" "$_DTF_FN" "$*\n"
+    _DT_MSG_TEMP="$%: %s"
+    if [ "$1" != "-n" ] ; then
+        _DT_MSG_TEMP="${_DT_MSG_TEMP}\n"
+    else
+        shift
+    fi
+    # shellcheck disable=SC2059
+    printf >&2 "${_DT_MSG_TEMP}" "$_DTF_FN" "$*"
+    unset _DT_MSG_TEMP
 }
 
 _dtf_clear() {
@@ -87,15 +95,18 @@ dtf() {
     if [ ! -f ~/."$_DTF_FN".sh ] ; then
         _dtf_msg "shell source is missing!? Please run '${_DTF_FN} upgrade' to install it again."
     elif [ "$*" = "upgrade" ] ; then
+        _dtf_msg -n "downloading... "
         if _dtf_output_url "${DTF_URL}" ~/."$_DTF_FN".sh.$$ ; then
+            _dtf_msg -n "upgrading... "
             # shellcheck source=/dev/null
             . ~/".$_DTF_FN".sh.$$ && \
                 cat ~/."$_DTF_FN".sh.$$ > ~/."$_DTF_FN".sh && \
                 rm -f ~/."$_DTF_FN".sh.$$
         else
-            _dtf_msg "upgrade failed"
+            _dtf_msg "failed"
             _dtf_clear ; return 1
         fi
+        _dtf_msg "success"
         _dtf_clear ; return
     fi
 
