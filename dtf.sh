@@ -54,10 +54,20 @@ dtf() {
                     return 1
                 fi
             fi
-            if ! grep -q "^. ~/.${_DTF_FN}.sh$" ~/.bashrc 2>/dev/null ; then
-                [ -f ~/.bashrc ] || touch ~/.bashrc
-                echo ". ~/.${_DTF_FN}.sh" >> ~/.bashrc
+            # add to POSIX (ash, ksh), bash, and zsh rc files
+            if [ -n "${ENV:-}" ] ; then
+                _DTF_RCFILE="$ENV"
+            elif [ -n "${BASH_VERSION:-}" ] ; then
+                _DTF_RCFILE="$HOME/.bashrc"
+            elif [ -n "${ZSH_VERSION:-}" ] ; then
+                _DTF_RCFILE="$HOME/.zshrc"
             fi
+
+            if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
+                [ -f "$_DTF_RCFILE" ] || touch "$_DTF_RCFILE"
+                echo ". \"\$HOME/.${_DTF_FN}.sh\"" >> "$_DTF_RCFILE"
+            fi
+            unset _DTF_RCFILE
         fi
         if [ -n "${_DTF_INIT:-}" ] ; then
             _dtf reset --hard "origin/${DTF_BRANCH}"
