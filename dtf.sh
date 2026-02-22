@@ -20,7 +20,6 @@ _dtf_output_url() {
 dtf() {
     export _DTF_FN="dtf"
     export _DTF_WORKDIR="$HOME/.${_DTF_FN}"
-    DTF_CHECKS=${DTF_CHECKS:-1}
     DTF_URL=${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/dtf.sh}
     DTF_BRANCH=${DTF_BRANCH:-main}
     if [ -z "$DTF_REPO" ] ; then
@@ -35,7 +34,8 @@ dtf() {
             _DTF_INIT=1
             DTF_CHECKS=1
         fi
-        if [ "${DTF_CHECKS}" -eq 1 ] ; then
+        if [ "${DTF_CHECKS:-0}" -eq 1 ] ; then
+            unset DTF_CHECKS
             if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
                 if ! _dtf config --local status.showUntrackedFiles no ; then
                     _dtf_msg "config set failed"
