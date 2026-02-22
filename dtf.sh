@@ -6,7 +6,7 @@
 alias _dtf='/usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME"'
 
 _dtf_msg() {
-    echo >&2 "${_DTF_FN}: $*"
+    printf >&2 "%s: %s" "$_DTF_FN" "$*\n"
 }
 
 _dtf_output_url() {
@@ -54,20 +54,25 @@ dtf() {
                     return 1
                 fi
             fi
-            # add to POSIX (ash, ksh), bash, and zsh rc files
-            if [ -n "${ENV:-}" ] ; then
-                _DTF_RCFILE="$ENV"
-            elif [ -n "${BASH_VERSION:-}" ] ; then
-                _DTF_RCFILE="$HOME/.bashrc"
-            elif [ -n "${ZSH_VERSION:-}" ] ; then
-                _DTF_RCFILE="$HOME/.zshrc"
-            fi
+            if [ -z "${DTF_AUTORC:-}" ] || [ "${DTF_AUTORC:-}" = "1" ] ; then
+                # add to POSIX (ash, ksh), bash, and zsh rc files
+                if [ -n "${ENV:-}" ] ; then
+                    _DTF_RCFILE="$ENV"
+                elif [ -n "${BASH_VERSION:-}" ] ; then
+                    _DTF_RCFILE="$HOME/.bashrc"
+                elif [ -n "${ZSH_VERSION:-}" ] ; then
+                    _DTF_RCFILE="$HOME/.zshrc"
+                fi
 
-            if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
-                [ -f "$_DTF_RCFILE" ] || touch "$_DTF_RCFILE"
-                echo ". \"\$HOME/.${_DTF_FN}.sh\"" >> "$_DTF_RCFILE"
+                if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
+                    [ -f "$_DTF_RCFILE" ] || touch "$_DTF_RCFILE"
+                    echo ". \"\$HOME/.${_DTF_FN}.sh\"" >> "$_DTF_RCFILE"
+                fi
+                unset _DTF_RCFILE
+            else
+                _dtf_msg "DTF_AUTORC is disabled, skipping shell source setup."
+                _dtf_msg "Manually add '. \"\$HOME/.${_DTF_FN}.sh\"' to your shell rc file."
             fi
-            unset _DTF_RCFILE
         fi
         if [ -n "${_DTF_INIT:-}" ] ; then
             _dtf reset --hard "origin/${DTF_BRANCH}"
