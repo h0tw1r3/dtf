@@ -17,10 +17,11 @@ _dtf_clear() {
 }
 
 _dtf_output_url() {
-    if command -v curl >/dev/null ; then
-        curl --connect-timeout 5 -L -sSf -o "${2}" "${1}";
-    else
-        wget --timeout 5 --tries=1 -qO "${2}" "${1}";
+    if ! curl --connect-timeout 5 -L -sSf -o "${2}" "${1}" ; then
+        if ! wget --timeout 5 --tries=1 -qO "${2}" "${1}"; then
+            _dtf_msg "failed to download: ${1}"
+            return 1
+        fi
     fi
 }
 
