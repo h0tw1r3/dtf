@@ -8,10 +8,12 @@ home directory management with git
 
        export DTF_REPO="https://github.com/h0tw1r3/dtf_example.git"
 
-2. Source the latest version of supported for your shell.
-   _Currently only bash is supported._
+2. Install the script by downloading and sourcing it:
+   _Should work on any shell supporting POSIX,
+   but only tested on ash, bash and zsh_
 
-       source /dev/stdin <<< "$(curl -Ls https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf)"
+       curl -Ls https://github.com/h0tw1r3/dtf/raw/main/dtf.sh > ~/.dtf.sh
+       . ~/.dtf.sh
 
 3. Watch the magic! __Careful, files in your `DTF_REPO` will overwrite
    any existing files in your home directory!__

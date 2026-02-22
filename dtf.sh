@@ -1,5 +1,5 @@
-#!/bin/bash
-
+# shellcheck shell=sh
+#
 # MIT License
 # Copyright (c) 2021 Jeffrey Clark <https://github.com/h0tw1r3>
 
@@ -18,17 +18,13 @@ _dtf_output_url() {
 }
 
 dtf() {
-    local _CHECKS="${DTF_CHECKS:-1}"
-    local _REPO="$HOME/.${FUNCNAME[0]}"
-    local _DTFURL="${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/.bash_dtf}"
-    local _BRANCH="${DTF_BRANCH:-master}"
-    local _INIT
-    if [ -z "$_DTF_FN" ] ; then
-        export _DTF_FN="${FUNCNAME[0]}"
-    fi
-
+    export _DTF_FN="dtf"
+    _CHECKS="${DTF_CHECKS:-1}"
+    _REPO="$HOME/.${_DTF_FN}"
+    _DTFURL="${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/dtf.sh}"
+    _BRANCH="${DTF_BRANCH:-main}"
     if [ -z "$DTF_REPO" ] ; then
-        echo >&2 "${FUNCNAME[0]}: DTF_REPO not set"
+        echo >&2 "${_DTF_FN}: DTF_REPO not set"
         return 1
     else
         if [ ! -f "$_REPO/config" ] ; then
@@ -64,16 +60,15 @@ dtf() {
                     return 1
                 fi
             fi
-            if ! grep -q "^source ~/.bash_dtf$" ~/.bashrc 2>/dev/null ; then
+            if ! grep -q "^. ~/.${_DTF_FN}.sh$" ~/.bashrc 2>/dev/null ; then
                 [ -f ~/.bashrc ] || touch ~/.bashrc
-                echo "source ~/.bash_dtf" >> ~/.bashrc
+                echo ". ~/.${_DTF_FN}.sh" >> ~/.bashrc
             fi
         fi
         if [ -n "${_INIT}" ] ; then
             _dtf reset --hard "origin/${_BRANCH}"
             _dtf submodule update --init --recursive
         fi
-        local _TREF
         _TREF=$(_dtf for-each-ref --format='%(upstream:short)' "$(_dtf symbolic-ref -q HEAD)")
         if [ "${_TREF}" != "origin/${_BRANCH}" ] ; then
             if ! _dtf branch -u "origin/${_BRANCH}" ; then
@@ -84,20 +79,16 @@ dtf() {
             _dtf submodule update --recursive
         fi
     fi
-    if [ ! -f ~/.bash_dtf ] ; then
-        {
-            alias _dtf
-            declare -f _dtf_msg
-            declare -f _dtf_output_url
-            declare -f dtf
-        } > ~/.bash_dtf
-    elif [[ "$*" == "upgrade" ]] ; then
-        if _dtf_output_url "${_DTFURL}" ~/.bash_dtf.$$ ; then
-            source ~/.bash_dtf.$$ && \
-                cat ~/.bash_dtf.$$ > ~/.bash_dtf && \
-                rm -f ~/.bash_dtf.$$
+    if [ ! -f ~/."$_DTF_FN".sh ] ; then
+        _dtf_msg "shell source is missing!? Please run '${_DTF_FN} upgrade' to install it again."
+    elif [ "$*" = "upgrade" ] ; then
+        if _dtf_output_url "${_DTFURL}" ~/."$_DTF_FN".sh.$$ ; then
+            # shellcheck source=/dev/null
+            . ~/".$_DTF_FN".sh.$$ && \
+                cat ~/."$_DTF_FN".sh.$$ > ~/."$_DTF_FN".sh && \
+                rm -f ~/."$_DTF_FN".sh.$$
         else
-            echo >&2 "failed to upgrade dtf"
+            _dtf_msg "upgrade failed"
             return 1
         fi
         return
@@ -105,3 +96,5 @@ dtf() {
 
     _dtf "$@"
 }
+
+# vim:syntax=sh filetype=sh expandtab ts=4 sw=4
