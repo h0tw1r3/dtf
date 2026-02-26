@@ -45,7 +45,7 @@ dtf() {
         fi
         _DTF_INIT=1
     fi
-    if [ "${_DTF_INIT:-$DTF_CHECKS}" -eq 1 ] ; then
+    if [ "${_DTF_INIT:-$DTF_CHECKS}" = "1" ] ; then
         if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
             if ! _dtf config --local status.showUntrackedFiles no ; then
                 _dtf_msg "config set failed"
