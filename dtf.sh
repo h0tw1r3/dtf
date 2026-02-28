@@ -76,6 +76,9 @@ dtf() {
                 _DTF_RCFILE="$HOME/.bashrc"
             elif [ -n "${ZSH_VERSION:-}" ] ; then
                 _DTF_RCFILE="$HOME/.zshrc"
+            else
+                _dtf_msg "unknown shell, cannot determine rc file for source setup"
+                _dtf_clear ; return 1
             fi
 
             if ! grep -qF ". \"\$HOME/.${_DTF_FN}.sh\"" "$_DTF_RCFILE" 2>/dev/null ; then
