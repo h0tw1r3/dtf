@@ -6,7 +6,7 @@
 alias _dtf='/usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME"'
 
 _dtf_msg() {
-    _DT_MSG_TEMP="$%: %s"
+    _DT_MSG_TEMP="%s: %s"
     if [ "$1" != "-n" ] ; then
         _DT_MSG_TEMP="${_DT_MSG_TEMP}\n"
     else
