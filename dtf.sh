@@ -3,7 +3,10 @@
 # MIT License
 # Copyright (c) 2021 Jeffrey Clark <https://github.com/h0tw1r3>
 
-alias _dtf='/usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME"'
+_dtf() {
+    _dtf_debug /usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME" "$*"
+    /usr/bin/env git --git-dir="$_DTF_WORKDIR" --work-tree="$HOME" "$@"
+}
 
 _dtf_msg() {
     _DT_MSG_TEMP="%s: %s"
@@ -17,11 +20,27 @@ _dtf_msg() {
     unset _DT_MSG_TEMP
 }
 
+_dtf_debug() {
+    if [ -n "${DTF_DEBUG}" ] ; then
+        _dtf_msg "[debug] $*"
+    fi
+}
+
 _dtf_clear() {
     unset _DTF_FN
     unset _DTF_WORKDIR
-    unset _DTF_INIT
     unset _DTF_RCFILE
+    set -- `set | while IFS= read -r _line; do
+        case "$_line" in
+            _DTF_CONFIG*=*)
+                printf '%s ' "${_line%%=*}"
+                ;;
+        esac
+    done`
+    if [ $# -gt 0 ] ; then
+        unset "$@"
+    fi
+
 }
 
 _dtf_output_url() {
@@ -33,8 +52,32 @@ _dtf_output_url() {
     fi
 }
 
+_dtf_config() {
+    if [ "$1" = "--set" ]; then
+        # Usage: --set <full.git.key> <value>
+        [ -z "$3" ] && return 1
+        _dtf config --local "$2" "$3"
+        set -- "$2" "$3"
+    else
+        # Usage: <full.git.key> [default_fallback]
+        [ -z "$1" ] && return 1
+        set -- "$1" "$(_dtf config --local --get "$1" 2>/dev/null || printf '%s' "$2")"
+    fi
+
+    # $1: original key (e.g. filters.xyz.smudge)
+    # $2: the value
+    # $3: sanitized suffix (FILTERS_XYZ_SMUDGE)
+    # tr converts lowercase to uppercase and swaps '.' and '-' for '_'
+    set -- "$1" "$2" "$(printf '%s' "$1" | tr '[:lower:].-' '[:upper:]__')"
+
+    if [ -n "$2" ]; then
+        eval "_DTF_CONFIG_$3=\"\$2\""
+    fi
+}
+
 # Returns branch name in _dtf_branch, 0 on success, 1 on failure.
 _dtf_detect_branch() {
+    _dtf_debug "detecting branch"
     _dtf_branch=""
     [ -n "${DTF_BRANCH:-}" ] && _dtf rev-parse "origin/${DTF_BRANCH}" >/dev/null 2>&1 && \
         { _dtf_branch="$DTF_BRANCH"; return 0; }
@@ -95,53 +138,68 @@ dtf() {
     export _DTF_WORKDIR="$HOME/.${_DTF_FN}"
     DTF_URL=${DTF_URL:-https://github.com/h0tw1r3/dtf/raw/main/dtf.sh}
     if [ ! -f "${_DTF_WORKDIR}/config" ] ; then
+        _dtf_debug "config does not exist, init repo"
         if ! _dtf init "$_DTF_WORKDIR" >/dev/null ; then
             _dtf_msg "failed to init repo"
             _dtf_clear ; return 1
         fi
-        _DTF_INIT=1
     fi
-    if [ "${_DTF_INIT:-$DTF_CHECKS}" = "1" ] ; then
-        if [ "$(_dtf config --local --get status.showUntrackedFiles)" != "no" ] ; then
-            if ! _dtf config --local status.showUntrackedFiles no ; then
-                _dtf_msg "config set failed"
-                _dtf_clear ; return 1
-            fi
-        fi
+
+    _dtf_config dtf.initialized no
+
+    if [ "$_DTF_CONFIG_DTF_INITIALIZED" != "yes" ] ; then
+        _dtf_debug "initializing"
+        _dtf_config --set status.showUntrackedFiles no
+        _dtf_config --set filter.chmod-user-only.smudge 'chmod 0600 %f; cat'
         if ! _dtf remote get-url origin >/dev/null 2>&1 ; then
+            _dtf_debug "remote origin not set"
             if [ -n "${DTF_REPO:-}" ] ; then
+                _dtf_debug "adding remote origin: ${DTF_REPO}"
                 if ! _dtf remote add origin "$DTF_REPO" ; then
                     _dtf_msg "failed to add remote origin $DTF_REPO"
                     _dtf_clear ; return 1
                 fi
-                if _dtf fetch origin 2>/dev/null ; then
-                    if [ "${_DTF_INIT:-}" = "1" ] && _dtf_detect_branch ; then
-                        _dtf reset --hard "origin/${_dtf_branch}" && _dtf submodule update --init --recursive
-                        unset _dtf_branch
-                    fi
-                else
-                    _dtf remote remove origin 2>/dev/null
-                    _dtf_msg "Could not access DTF_REPO (${DTF_REPO}). Continuing with local-only repo. Add remote later when accessible: dtf remote add origin <url>"
-                fi
-            elif [ "${_DTF_INIT:-}" = "1" ] ; then
+            else
                 _dtf_msg "Local repo initialized. Add a remote later with: dtf remote add origin <url>"
-            fi
-        else
-            if [ ! -d "${_DTF_WORKDIR}/refs/remotes/origin" ] ; then
-                if ! _dtf fetch origin ; then
-                    _dtf_msg "failed to fetch remote"
-                    _dtf_clear ; return 1
-                fi
-            fi
-            if [ "${_DTF_INIT:-}" = "1" ] && _dtf_detect_branch ; then
-                _dtf reset --hard "origin/${_dtf_branch}" && _dtf submodule update --init --recursive
-                unset _dtf_branch
+                _dtf_config --set dtf.initialized yes
             fi
         fi
+
+        if [ "$_DTF_CONFIG_DTF_INITIALIZED" != "yes" ] ; then
+            _dtf_debug "fetching origin"
+            if _dtf fetch origin 2>/dev/null ; then
+                if ! _dtf_detect_branch ; then
+                    _dtf_msg "Failed to determine branch, unable to checkout."
+                    _dtf_clear ; return 1
+                fi
+                if ! _dtf reset --hard "origin/${_dtf_branch}" ; then
+                    _dtf_msg "Fatal error checking out branch 'origin/${_dtf_branch}'"
+                    _dtf_clear ; return 1
+                fi
+                if ! _dtf branch -m "${_dtf_branch}" ; then
+                    _dtf_msg "Fatal error setting current branch name"
+                    _dtf_clear ; return 1
+                fi
+                if ! _dtf branch --set-upstream-to="origin/${_dtf_branch}" "${_dtf_branch}" ; then
+                    _dtf_msg "Error tracking branch 'origin/${_dtf_branch}' to '${_dtf_branch}'"
+                    _dtf_clear ; return 1
+                fi
+                if ! _dtf submodule update --init --recursive ; then
+                    _dtf_msg "Warning, failed to initialize submodules, continuing anyway"
+                fi
+                unset _dtf_branch
+            else
+                _dtf remote remove origin 2>/dev/null
+                _dtf_msg "Warning, failed to fetch DTF_REPO (${DTF_REPO}). Continuing with local-only repo. Add remote later when accessible: dtf remote add origin <url>"
+            fi
+        fi
+
         if [ -z "${DTF_AUTORC:-}" ] || [ "${DTF_AUTORC:-}" = "1" ] ; then
             # add to POSIX (ash, ksh), bash, and zsh rc files
             if [ -n "${ENV:-}" ] ; then
                 _DTF_RCFILE="$ENV"
+            elif [ -f ~/.commonrc ] ; then
+                _DTF_RCFILE="$HOME/.commonrc"
             elif [ -n "${BASH_VERSION:-}" ] ; then
                 _DTF_RCFILE="$HOME/.bashrc"
             elif [ -n "${ZSH_VERSION:-}" ] ; then
@@ -160,6 +218,8 @@ dtf() {
             _dtf_msg "DTF_AUTORC is disabled, skipping shell source setup."
             _dtf_msg "Manually add '. \"\$HOME/.${_DTF_FN}.sh\"' to your shell rc file."
         fi
+
+        _dtf_config --set dtf.initialized yes
     fi
     if [ ! -f ~/."$_DTF_FN".sh ] ; then
         _dtf_msg "shell source is missing!? Please run '${_DTF_FN} upgrade' to install it again."
